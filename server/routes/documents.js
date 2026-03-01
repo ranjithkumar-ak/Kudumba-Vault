@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import Document from "../models/Document.js";
+import User from "../models/User.js";
 import { auth } from "../middleware/auth.js";
 
 const router = Router();
@@ -12,7 +13,20 @@ router.use(auth);
 // GET /api/documents — list user's documents
 router.get("/", async (req, res) => {
   try {
-    const docs = await Document.find({ userId: req.userId }).sort({ timestamp: -1 });
+    const user = await User.findById(req.userId).select('role');
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    let docs;
+    if (user.role === 'owner') {
+      docs = await Document.find({ userId: req.userId }).sort({ timestamp: -1 });
+    } else {
+      // For members, find documents shared with them
+      docs = await Document.find({
+        privacy: 'shared',
+        'sharedWith.memberId': req.userId,
+        'sharedWith.revoked': false
+      }).sort({ timestamp: -1 });
+    }
     res.json(docs);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch documents" });

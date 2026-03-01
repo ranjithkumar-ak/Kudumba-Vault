@@ -5,6 +5,7 @@ import { authApi, documentsApi, membersApi, alertsApi } from "@/services/api";
 interface VaultContextType {
   isLoggedIn: boolean;
   userRole: UserRole;
+  userId: string;
   userName: string;
   userEmail: string;
   familyName: string;
@@ -34,6 +35,7 @@ const VaultContext = createContext<VaultContextType | null>(null);
 export function VaultProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(() => authApi.hasToken());
   const [userRole, setUserRole] = useState<UserRole>("owner");
+  const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [familyName, setFamilyName] = useState("");
@@ -60,6 +62,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     if (!authApi.hasToken()) return;
     authApi.me()
       .then(user => {
+        setUserId(user.id);
         setUserName(user.name);
         setUserEmail(user.email);
         setFamilyName(user.familyName);
@@ -100,6 +103,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (name: string, email: string, password: string, family: string) => {
     const res = await authApi.register({ name, email, password, familyName: family });
     authApi.saveToken(res.token);
+    setUserId(res.user.id);
     setUserName(res.user.name);
     setUserEmail(res.user.email);
     setFamilyName(res.user.familyName);
@@ -112,6 +116,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await authApi.login({ email, password });
       authApi.saveToken(res.token);
+      setUserId(res.user.id);
       setUserName(res.user.name);
       setUserEmail(res.user.email);
       setFamilyName(res.user.familyName);
@@ -134,6 +139,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     setDocuments([]);
     setMembers([]);
     setAlerts([]);
+    setUserId("");
     setUserName("");
     setUserEmail("");
     setFamilyName("");
@@ -215,7 +221,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <VaultContext.Provider value={{
-      isLoggedIn, userRole, userName, userEmail, familyName, documents, members, alerts, isFirstTime, loading,
+      isLoggedIn, userRole, userId, userName, userEmail, familyName, documents, members, alerts, isFirstTime, loading,
       register, login, loginWithRole, logout,
       addDocument, deleteDocument, updateDocumentBlockchain, shareDocument, revokeAccess,
       addMember, removeMember, addAlert, resetData, refreshData,

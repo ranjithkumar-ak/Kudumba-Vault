@@ -348,7 +348,7 @@ const SharingPage = () => {
             </TableHeader>
             <TableBody>
               {allLogs.map(l => (
-                <TableRow key={l.id}>
+                <TableRow key={`${l.timestamp}-${l.action}`}>
                   <TableCell className="font-medium">{l.userName}</TableCell>
                   <TableCell>{l.action}</TableCell>
                   <TableCell>{l.docName}</TableCell>

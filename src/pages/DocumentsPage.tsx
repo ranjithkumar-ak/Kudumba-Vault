@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { FileText, Shield, Hash, Cloud, Clock, Share2, Download, CheckCircle2, Server, ExternalLink, Loader2, LinkIcon, AlertCircle, Trash2, Upload } from "lucide-react";
@@ -27,9 +27,7 @@ const DocumentsPage = () => {
   const [downloading, setDownloading] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ exists: boolean; owner: string; timestamp: number } | null>(null);
 
-  const visibleDocs = userRole === "member"
-    ? documents.filter(d => d.privacy === "shared")
-    : documents;
+  const visibleDocs = documents;
 
   const filtered = filter === "all" ? visibleDocs : visibleDocs.filter(d => d.category === filter);
 
@@ -127,6 +125,7 @@ const DocumentsPage = () => {
                 <span className="text-2xl">{CATEGORY_INFO[selected.category].icon}</span>
                 {selected.name}
               </DialogTitle>
+              <DialogDescription>Document details, security information, and actions</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -321,7 +320,7 @@ const DocumentsPage = () => {
                   <p className="mb-2 text-sm font-medium">Access Log</p>
                   <div className="max-h-32 space-y-1 overflow-y-auto">
                     {selected.accessLog.map(l => (
-                      <div key={l.id} className="flex justify-between text-xs text-muted-foreground">
+                      <div key={`${selected.id}-${l.id}`} className="flex justify-between text-xs text-muted-foreground">
                         <span>{l.userName}: {l.action}</span>
                         <span>{format(new Date(l.timestamp), "MMM d, HH:mm")}</span>
                       </div>
