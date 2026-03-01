@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import Document from "../models/Document.js";
 import User from "../models/User.js";
+import Alert from "../models/Alert.js";
 import { auth } from "../middleware/auth.js";
 
 const router = Router();
@@ -83,8 +84,14 @@ router.post("/", upload.single("file"), async (req, res) => {
 // GET /api/documents/:id — get document (without file data)
 router.get("/:id", async (req, res) => {
   try {
-    const doc = await Document.findOne({ _id: req.params.id, userId: req.userId });
+    const doc = await Document.findOne({ _id: req.params.id });
     if (!doc) return res.status(404).json({ error: "Document not found" });
+
+    // Check access: owner or shared with user and not revoked
+    if (doc.userId.toString() !== req.userId && !(doc.privacy === 'shared' && doc.sharedWith.some(s => s.memberId === req.userId && !s.revoked))) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     res.json(doc);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch document" });
@@ -94,8 +101,14 @@ router.get("/:id", async (req, res) => {
 // GET /api/documents/:id/file — download encrypted file data
 router.get("/:id/file", async (req, res) => {
   try {
-    const doc = await Document.findOne({ _id: req.params.id, userId: req.userId }).select("+fileData");
+    const doc = await Document.findOne({ _id: req.params.id }).select("+fileData");
     if (!doc || !doc.fileData) return res.status(404).json({ error: "File not found" });
+
+    // Check access: owner or shared with user and not revoked
+    if (doc.userId.toString() !== req.userId && !(doc.privacy === 'shared' && doc.sharedWith.some(s => s.memberId === req.userId && !s.revoked))) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     res.set("Content-Type", "application/octet-stream");
     res.set("Content-Disposition", `attachment; filename="${doc.originalName || doc.name}"`);
     res.send(doc.fileData);
@@ -149,6 +162,15 @@ router.post("/:id/share", async (req, res) => {
     });
 
     await doc.save();
+
+    // Create alert for the member
+    await Alert.create({
+      userId: memberId,
+      type: "share",
+      description: `Document "${doc.name}" has been shared with you.`,
+      status: "warning",
+    });
+
     res.json(doc);
   } catch (err) {
     res.status(500).json({ error: "Failed to share document" });

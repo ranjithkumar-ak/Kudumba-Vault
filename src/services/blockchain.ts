@@ -23,7 +23,7 @@ export const SUPPORTED_NETWORKS: Record<string, NetworkConfig> = {
   sepolia: {
     chainId: 11155111,
     name: "Ethereum Sepolia Testnet",
-    rpcUrl: "https://rpc.sepolia.org",
+    rpcUrl: "https://ethereum-sepolia.publicnode.com",
     explorerUrl: "https://sepolia.etherscan.io",
     contractAddress: "", // Set after deployment
     currency: { name: "Sepolia ETH", symbol: "SEP", decimals: 18 },
