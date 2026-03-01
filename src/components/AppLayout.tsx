@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useVault } from "@/context/VaultContext";
-import { LayoutDashboard, Upload, FileText, Share2, Users, RefreshCw, ShieldAlert, LogOut, Shield, Menu, X } from "lucide-react";
+import { LayoutDashboard, Upload, FileText, Share2, Users, RefreshCw, ShieldAlert, Settings, LogOut, Shield, Menu, X } from "lucide-react";
 import WalletStatus from "@/components/WalletStatus";
 
 const NAV_ITEMS = [
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: "/members", label: "Members", icon: Users },
   { to: "/recovery", label: "Recovery", icon: RefreshCw },
   { to: "/alerts", label: "Alerts", icon: ShieldAlert },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
@@ -20,7 +21,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const visibleNav = userRole === "member"
-    ? NAV_ITEMS.filter(i => ["/dashboard", "/documents"].includes(i.to))
+    ? NAV_ITEMS.filter(i => ["/dashboard", "/documents", "/settings"].includes(i.to))
     : NAV_ITEMS;
 
   const sidebarContent = (

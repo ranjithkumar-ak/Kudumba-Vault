@@ -4,7 +4,7 @@
  * Supports: Sepolia Testnet, Local Hardhat, and any EVM-compatible network
  */
 
-import { ethers, BrowserProvider, Contract, JsonRpcSigner, TransactionReceipt } from "ethers";
+import { ethers, BrowserProvider, Contract, JsonRpcSigner, TransactionReceipt, JsonRpcProvider } from "ethers";
 import KudumbaVaultArtifact from "@/contracts/KudumbaVault.json";
 import { toBytes32 } from "./crypto";
 
@@ -64,17 +64,20 @@ export interface WalletInfo {
   balance: string;
   network: string;
   chainId: number;
+  /** Whether this is a managed (non-MetaMask) wallet */
+  managed?: boolean;
 }
 
 // ─── Blockchain Service Class ───────────────────────────────────────────────────
 
 class BlockchainService {
-  private provider: BrowserProvider | null = null;
-  private signer: JsonRpcSigner | null = null;
+  private provider: BrowserProvider | JsonRpcProvider | null = null;
+  private signer: JsonRpcSigner | ethers.Wallet | null = null;
   private contract: Contract | null = null;
   private _currentNetwork: NetworkConfig | null = null;
   private _contractAddress: string = "";
   private _transactions: BlockchainTx[] = [];
+  private _isManaged: boolean = false;
 
   /**
    * Check if MetaMask (or any EIP-1193 provider) is available
@@ -112,6 +115,59 @@ class BlockchainService {
   }
 
   /**
+   * Connect using a managed wallet (no MetaMask required)
+   * The private key is decrypted client-side and used directly with ethers.js
+   */
+  async connectManagedWallet(privateKey: string, rpcUrl?: string): Promise<WalletInfo> {
+    const url = rpcUrl || SUPPORTED_NETWORKS.sepolia.rpcUrl;
+    const jsonProvider = new JsonRpcProvider(url);
+    const wallet = new ethers.Wallet(privateKey, jsonProvider);
+
+    this.provider = jsonProvider;
+    this.signer = wallet;
+    this._isManaged = true;
+
+    const address = wallet.address;
+    let balance = "0";
+    try {
+      balance = ethers.formatEther(await jsonProvider.getBalance(address));
+    } catch {
+      // Balance fetch may fail on some networks — not critical
+    }
+
+    const network = await jsonProvider.getNetwork();
+    this._currentNetwork = Object.values(SUPPORTED_NETWORKS).find(
+      n => BigInt(n.chainId) === network.chainId
+    ) || null;
+
+    // Restore saved contract address
+    const savedAddr = localStorage.getItem("kudumba_contract_address");
+    if (savedAddr) {
+      try {
+        this.contract = new Contract(savedAddr, KudumbaVaultArtifact.abi, this.signer);
+        this._contractAddress = savedAddr;
+      } catch {
+        localStorage.removeItem("kudumba_contract_address");
+      }
+    }
+
+    return {
+      address,
+      balance,
+      network: this._currentNetwork?.name || `Chain ${network.chainId}`,
+      chainId: Number(network.chainId),
+      managed: true,
+    };
+  }
+
+  /**
+   * Check if the current wallet is a managed (non-MetaMask) wallet
+   */
+  get isManaged(): boolean {
+    return this._isManaged;
+  }
+
+  /**
    * Disconnect wallet
    */
   disconnect(): void {
@@ -119,6 +175,7 @@ class BlockchainService {
     this.signer = null;
     this.contract = null;
     this._currentNetwork = null;
+    this._isManaged = false;
   }
 
   /**
@@ -135,6 +192,7 @@ class BlockchainService {
         balance,
         network: this._currentNetwork?.name || `Chain ${network.chainId}`,
         chainId: Number(network.chainId),
+        managed: this._isManaged,
       };
     } catch {
       return null;

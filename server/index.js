@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth.js";
 import documentRoutes from "./routes/documents.js";
 import memberRoutes from "./routes/members.js";
 import alertRoutes from "./routes/alerts.js";
+import verificationRoutes from "./routes/verification.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,6 +20,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/alerts", alertRoutes);
+app.use("/api/verification", verificationRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

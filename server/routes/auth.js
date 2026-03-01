@@ -45,10 +45,25 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
     const token = generateToken(user._id.toString(), user.email);
-    res.json({
+
+    // For member-role users, include encrypted wallet data so the client
+    // can decrypt the private key using the password (which we verified above
+    // but never store in plaintext)
+    const response = {
       token,
       user: { id: user._id, name: user.name, email: user.email, familyName: user.familyName, role: user.role },
-    });
+    };
+
+    if (user.role === "member" && user.encryptedWallet?.encryptedKey) {
+      response.encryptedWallet = {
+        encryptedKey: user.encryptedWallet.encryptedKey,
+        salt: user.encryptedWallet.salt,
+        address: user.walletAddress,
+        version: user.encryptedWallet.version || 1,
+      };
+    }
+
+    res.json(response);
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Login failed" });
@@ -60,7 +75,10 @@ router.get("/me", auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-passwordHash");
     if (!user) return res.status(404).json({ error: "User not found" });
-    res.json({ id: user._id, name: user.name, email: user.email, familyName: user.familyName, role: user.role });
+    const profile = { id: user._id, name: user.name, email: user.email, familyName: user.familyName, role: user.role };
+    // Include wallet address for members so the UI can show it
+    if (user.walletAddress) profile.walletAddress = user.walletAddress;
+    res.json(profile);
   } catch (err) {
     res.status(500).json({ error: "Failed to get profile" });
   }

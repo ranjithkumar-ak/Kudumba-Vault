@@ -1,17 +1,17 @@
 /**
  * Wallet connection status component for the sidebar/header
- * Shows MetaMask connection state, address, and balance
+ * Shows MetaMask or managed wallet connection state, address, and balance
  */
 
 import { useBlockchain } from "@/context/BlockchainContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Wallet, Unplug, ExternalLink, Loader2 } from "lucide-react";
+import { Wallet, Unplug, ExternalLink, Loader2, Shield } from "lucide-react";
 import { formatHash } from "@/services/crypto";
 
 const WalletStatus = () => {
-  const { status, wallet, error, contractAddress, connectWallet, disconnectWallet } = useBlockchain();
+  const { status, wallet, error, contractAddress, isManagedWallet, connectWallet, disconnectWallet } = useBlockchain();
 
   if (status === "disconnected" || status === "error") {
     return (
@@ -48,7 +48,17 @@ const WalletStatus = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] font-medium text-green-400">Connected</span>
+            <span className="text-[10px] font-medium text-green-400">
+              {isManagedWallet ? "Managed Wallet" : "Connected"}
+            </span>
+            {isManagedWallet && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Shield className="h-2.5 w-2.5 text-blue-400" />
+                </TooltipTrigger>
+                <TooltipContent>Auto-managed wallet — no browser extension needed</TooltipContent>
+              </Tooltip>
+            )}
           </div>
           <Tooltip>
             <TooltipTrigger asChild>

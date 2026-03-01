@@ -1,11 +1,16 @@
 /**
  * Blockchain React Context for Kudumba Vault
  * Manages wallet connection, contract state, and blockchain operations
+ * 
+ * Dual-mode support:
+ * - OWNER: Uses MetaMask (full control, tech-savvy user)
+ * - MEMBER: Uses managed wallet (transparent, no MetaMask needed)
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { blockchainService, WalletInfo, BlockchainTx, BlockchainDocRecord } from "@/services/blockchain";
 import { hashFile, hashData, encryptFile, generateEncryptionKey, exportKey } from "@/services/crypto";
+import { decryptManagedWallet, EncryptedWalletData } from "@/services/walletManager";
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -18,9 +23,11 @@ interface BlockchainContextType {
   error: string | null;
   contractAddress: string;
   transactions: BlockchainTx[];
+  isManagedWallet: boolean;
 
   // Connection actions
   connectWallet: () => Promise<void>;
+  connectWithManagedWallet: (encryptedWallet: EncryptedWalletData, password: string) => Promise<void>;
   disconnectWallet: () => void;
   deployContract: () => Promise<string>;
   connectToContract: (address: string) => Promise<void>;
@@ -119,6 +126,46 @@ export function BlockchainProvider({ children }: { children: React.ReactNode }) 
       setError(msg);
       setStatus("error");
       throw err;
+    }
+  }, []);
+
+  /**
+   * Connect using a managed wallet — for family members who don't have MetaMask.
+   * Decrypts the private key client-side using the member's password,
+   * then uses it as an ethers.js Wallet signer.
+   */
+  const connectWithManagedWallet = useCallback(async (
+    encryptedWallet: EncryptedWalletData,
+    password: string
+  ) => {
+    try {
+      setStatus("connecting");
+      setError(null);
+
+      // Decrypt the wallet client-side (password never leaves the browser)
+      const { privateKey } = await decryptManagedWallet(encryptedWallet, password);
+
+      // Connect the managed wallet to blockchain service
+      const info = await blockchainService.connectManagedWallet(privateKey);
+      setWallet(info);
+      setStatus("connected");
+
+      // Check for stored contract address
+      const savedAddr = localStorage.getItem("kudumba_contract_address");
+      if (savedAddr) {
+        try {
+          await blockchainService.connectToContract(savedAddr);
+          setContractAddr(savedAddr);
+        } catch {
+          localStorage.removeItem("kudumba_contract_address");
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to connect managed wallet";
+      setError(msg);
+      setStatus("error");
+      // Don't throw — managed wallet failure shouldn't block login
+      console.error("Managed wallet connection failed:", msg);
     }
   }, []);
 
@@ -248,7 +295,9 @@ export function BlockchainProvider({ children }: { children: React.ReactNode }) 
         error,
         contractAddress: contractAddr,
         transactions,
+        isManagedWallet: blockchainService.isManaged,
         connectWallet,
+        connectWithManagedWallet,
         disconnectWallet,
         deployContract,
         connectToContract,

@@ -10,11 +10,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { FileText, Shield, Hash, Cloud, Clock, Share2, Download, CheckCircle2, Server, ExternalLink, Loader2, LinkIcon, AlertCircle, Trash2, Upload } from "lucide-react";
+import { FileText, Shield, Hash, Cloud, Clock, Share2, Download, CheckCircle2, Server, ExternalLink, Loader2, LinkIcon, AlertCircle, Trash2, Upload, Lock } from "lucide-react";
 import { format } from "date-fns";
 import { formatHash, importKey, decryptFile } from "@/services/crypto";
 import { toast } from "@/hooks/use-toast";
 import { documentsApi } from "@/services/api";
+import VerificationGate from "@/components/VerificationGate";
+import { isSessionVerified, refreshVerification } from "@/services/verification";
 
 const DocumentsPage = () => {
   const { documents, members, userRole, deleteDocument } = useVault();
@@ -27,9 +29,49 @@ const DocumentsPage = () => {
   const [downloading, setDownloading] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ exists: boolean; owner: string; timestamp: number } | null>(null);
 
-  const visibleDocs = documents;
+  // Verification gate state (for members)
+  const [gateOpen, setGateOpen] = useState(false);
+  const [pendingDoc, setPendingDoc] = useState<VaultDocument | null>(null);
+  const [pendingAction, setPendingAction] = useState<"view" | "download" | null>(null);
 
+  const isMember = userRole === "member";
+  const visibleDocs = documents;
   const filtered = filter === "all" ? visibleDocs : visibleDocs.filter(d => d.category === filter);
+
+  /**
+   * For members: check verification before allowing document view/download.
+   * If already verified within 15 min, proceed. Otherwise show the gate.
+   */
+  const requireVerification = useCallback((doc: VaultDocument, action: "view" | "download") => {
+    if (!isMember) {
+      // Owners bypass verification
+      if (action === "view") setSelected(doc);
+      return true;
+    }
+
+    const session = isSessionVerified();
+    if (session.verified) {
+      refreshVerification();
+      if (action === "view") setSelected(doc);
+      return true;
+    }
+
+    // Need verification — show the gate
+    setPendingDoc(doc);
+    setPendingAction(action);
+    setGateOpen(true);
+    return false;
+  }, [isMember]);
+
+  const handleGateVerified = useCallback(() => {
+    setGateOpen(false);
+    if (pendingAction === "view" && pendingDoc) {
+      setSelected(pendingDoc);
+    }
+    // For download, we'll trigger it after verification via a separate check
+    setPendingDoc(null);
+    setPendingAction(null);
+  }, [pendingDoc, pendingAction]);
 
   const handleVerify = useCallback(async (doc: VaultDocument) => {
     if (!isContractReady || !doc.hash) return;
@@ -83,7 +125,7 @@ const DocumentsPage = () => {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((doc, i) => (
           <motion.div key={doc.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-            <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => setSelected(doc)}>
+            <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => requireVerification(doc, "view")}>
               <CardContent className="p-5">
                 <div className="mb-3 flex items-start justify-between">
                   <span className="text-2xl">{CATEGORY_INFO[doc.category].icon}</span>
@@ -109,6 +151,11 @@ const DocumentsPage = () => {
                 <div className="mt-3 flex items-center gap-2">
                   <Badge variant={doc.privacy === "shared" ? "default" : "secondary"} className="text-[11px]">{doc.privacy === "shared" ? "👨‍👩‍👧‍👦 Shared" : "🔒 Private"}</Badge>
                   <span className="text-[11px] text-muted-foreground">{format(new Date(doc.timestamp), "MMM d, yyyy")}</span>
+                  {isMember && (
+                    <Badge variant="outline" className="gap-1 text-[10px] ml-auto border-orange-500/30 text-orange-500">
+                      <Lock className="h-2.5 w-2.5" /> Verify
+                    </Badge>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -238,7 +285,8 @@ const DocumentsPage = () => {
                 <p className="mt-2 text-center text-[11px] text-muted-foreground">Your document is safe even if your device is lost.</p>
               </div>
 
-              {userRole === "owner" && (
+              {/* Action buttons — different for owner vs member */}
+              {userRole === "owner" ? (
                 <div className="flex gap-2">
                   <Button variant="outline" className="flex-1 gap-1" onClick={() => { setSelected(null); navigate("/sharing"); }}>
                     <Share2 className="h-4 w-4" /> Share
@@ -252,7 +300,6 @@ const DocumentsPage = () => {
                       try {
                         const encryptedBuf = await documentsApi.downloadFile(selected.id);
                         if (encryptedBuf && selected.encryptionKey) {
-                          // Decrypt and download real file
                           const key = await importKey(selected.encryptionKey);
                           const decrypted = await decryptFile(encryptedBuf, key);
                           const blob = new Blob([decrypted], { type: selected.fileType || "application/octet-stream" });
@@ -266,14 +313,10 @@ const DocumentsPage = () => {
                           URL.revokeObjectURL(url);
                           toast({ title: "Downloaded", description: `${selected.name} decrypted and downloaded.` });
                         } else {
-                          // Fallback: export metadata as JSON
                           const metadata = {
-                            name: selected.name,
-                            category: selected.category,
-                            fileType: selected.fileType,
-                            hash: selected.hash,
-                            timestamp: selected.timestamp,
-                            privacy: selected.privacy,
+                            name: selected.name, category: selected.category,
+                            fileType: selected.fileType, hash: selected.hash,
+                            timestamp: selected.timestamp, privacy: selected.privacy,
                             blockchain: selected.blockchain ?? null,
                           };
                           const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: "application/json" });
@@ -313,6 +356,70 @@ const DocumentsPage = () => {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+              ) : (
+                /* Member: download button only, re-verify if session expired */
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 gap-1"
+                    disabled={downloading}
+                    onClick={async () => {
+                      // Re-check verification for download (session might have expired)
+                      const session = isSessionVerified();
+                      if (!session.verified) {
+                        setPendingDoc(selected);
+                        setPendingAction("download");
+                        setGateOpen(true);
+                        setSelected(null);
+                        return;
+                      }
+                      refreshVerification();
+
+                      setDownloading(true);
+                      try {
+                        const encryptedBuf = await documentsApi.downloadFile(selected.id);
+                        if (encryptedBuf && selected.encryptionKey) {
+                          const key = await importKey(selected.encryptionKey);
+                          const decrypted = await decryptFile(encryptedBuf, key);
+                          const blob = new Blob([decrypted], { type: selected.fileType || "application/octet-stream" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = selected.name;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                          toast({ title: "Downloaded", description: `${selected.name} decrypted and downloaded.` });
+                        } else {
+                          const metadata = {
+                            name: selected.name, category: selected.category,
+                            fileType: selected.fileType, hash: selected.hash,
+                            timestamp: selected.timestamp, privacy: selected.privacy,
+                            blockchain: selected.blockchain ?? null,
+                          };
+                          const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: "application/json" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `${selected.name.replace(/\s+/g, "_")}_metadata.json`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                          toast({ title: "Downloaded", description: "No file data found — metadata exported." });
+                        }
+                      } catch (err) {
+                        toast({ title: "Download failed", description: String(err), variant: "destructive" });
+                      } finally {
+                        setDownloading(false);
+                      }
+                    }}
+                  >
+                    {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {downloading ? "Decrypting..." : "Download"}
+                  </Button>
+                </div>
               )}
 
               {selected.accessLog.length > 0 && (
@@ -332,6 +439,16 @@ const DocumentsPage = () => {
           </DialogContent>
         )}
       </Dialog>
+
+      {/* Verification Gate for members */}
+      {isMember && (
+        <VerificationGate
+          open={gateOpen}
+          onClose={() => { setGateOpen(false); setPendingDoc(null); setPendingAction(null); }}
+          onVerified={handleGateVerified}
+          title="Verify to Access Document"
+        />
+      )}
     </div>
   );
 };

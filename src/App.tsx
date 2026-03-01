@@ -14,6 +14,7 @@ import SharingPage from "@/pages/SharingPage";
 import MembersPage from "@/pages/MembersPage";
 import RecoveryPage from "@/pages/RecoveryPage";
 import AlertsPage from "@/pages/AlertsPage";
+import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
             <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
             <Route path="/recovery" element={<ProtectedRoute><RecoveryPage /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </BlockchainProvider>

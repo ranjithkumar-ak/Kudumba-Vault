@@ -15,7 +15,7 @@ interface VaultContextType {
   isFirstTime: boolean;
   loading: boolean;
   register: (name: string, email: string, password: string, familyName: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; encryptedWallet?: any }>;
   loginWithRole: (role: UserRole) => void;
   logout: () => void;
   addDocument: (name: string, category: DocumentCategory, privacy: PrivacyLevel, fileType: string, size: string, hash: string, blockchain?: BlockchainRecord, encryptionKey?: string, fileData?: string, originalName?: string, mimeType?: string) => Promise<VaultDocument>;
@@ -23,7 +23,7 @@ interface VaultContextType {
   updateDocumentBlockchain: (docId: string, blockchain: BlockchainRecord) => Promise<void>;
   shareDocument: (docId: string, memberId: string, permission: "view-only" | "time-limited", expiresAt?: string) => Promise<void>;
   revokeAccess: (docId: string, memberId: string) => Promise<void>;
-  addMember: (name: string, email: string, relationship: string, walletAddress?: string) => Promise<void>;
+  addMember: (name: string, email: string, relationship: string, password: string, encryptedWallet?: any) => Promise<void>;
   removeMember: (id: string) => Promise<void>;
   addAlert: (alert: Omit<SecurityAlert, "id">) => Promise<void>;
   resetData: () => void;
@@ -112,7 +112,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     setIsLoggedIn(true);
   }, []);
 
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; encryptedWallet?: any }> => {
     try {
       const res = await authApi.login({ email, password });
       authApi.saveToken(res.token);
@@ -122,9 +122,9 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       setFamilyName(res.user.familyName);
       setUserRole(res.user.role as UserRole);
       setIsLoggedIn(true);
-      return true;
+      return { success: true, encryptedWallet: res.encryptedWallet };
     } catch {
-      return false;
+      return { success: false };
     }
   }, []);
 
@@ -188,8 +188,8 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Member Actions (API-backed) ─────────────────────────────────────────
 
-  const addMember = useCallback(async (name: string, email: string, relationship: string, walletAddress?: string) => {
-    const member = await membersApi.create({ name, email, relationship, walletAddress });
+  const addMember = useCallback(async (name: string, email: string, relationship: string, password: string, encryptedWallet?: any) => {
+    const member = await membersApi.create({ name, email, relationship, password, encryptedWallet });
     setMembers(prev => [...prev, member as FamilyMember]);
   }, []);
 

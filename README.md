@@ -18,11 +18,12 @@ A cutting-edge family document management system that combines military-grade en
 - **Zero-Knowledge Architecture**: Server never sees unencrypted data
 - **Distributed Cloud Storage**: Files split across multiple secure nodes
 
-### ⛓️ **Blockchain Verification**
+### ⛓️ **Blockchain Verification (Optional)**
 - **Ethereum On-Chain Records**: Immutable document hashes stored on Ethereum
 - **Smart Contract Integration**: Automated verification and timestamping
 - **MetaMask Wallet Support**: Direct blockchain interaction
 - **Gas-Optimized Transactions**: Cost-effective on-chain operations
+- **Educational Onboarding**: Simple setup for non-technical users
 
 ### 👨‍👩‍👧‍👦 **Family Collaboration**
 - **Role-Based Access Control**: Owner and member permissions
@@ -42,12 +43,12 @@ A cutting-edge family document management system that combines military-grade en
 - **Smooth Animations**: Fluid transitions and micro-interactions
 - **Accessibility First**: WCAG 2.1 AA compliant
 
-## 🚀 Quick Start
+## � Quick Start
 
 ### Prerequisites
 - Node.js 18+ and npm
 - MongoDB 7.0+
-- MetaMask browser extension (for blockchain features)
+- MetaMask browser extension *(optional - for blockchain verification features)*
 - Git
 
 ### Installation
@@ -98,7 +99,33 @@ A cutting-edge family document management system that combines military-grade en
 6. **Access the application**
    - Open [http://localhost:5173](http://localhost:5173) in your browser
    - Create your family vault account
-   - Connect MetaMask for blockchain features
+   - **Blockchain features are optional** - family members can use all core features without MetaMask
+   - Owners can enable blockchain verification for enhanced security
+
+## 🛡️ User-Friendly Security
+
+### For Non-Technical Family Members
+Kudumba-Vault is designed so that **blockchain features are completely optional**. Family members can:
+
+- **Upload and access documents** with full AES-256-GCM encryption
+- **Share documents securely** within the family vault
+- **Use all core features** without any blockchain knowledge
+- **Receive notifications** about shared documents
+
+### Blockchain Integration (Optional)
+For users who want maximum security verification:
+
+- **MetaMask Setup Guide**: In-app tutorials walk through MetaMask installation
+- **One-Click Connection**: Simple "Connect Wallet" button with clear instructions
+- **Educational Tooltips**: Explanations of what blockchain verification does
+- **Owner-Only Option**: Family owners can enable blockchain features for the entire vault
+- **Fallback Security**: All documents remain encrypted even without blockchain
+
+### Security Without Compromise
+- **Same Encryption**: AES-256-GCM encryption applies to all documents
+- **Role-Based Access**: Family members see only shared documents
+- **Audit Logging**: All access attempts are tracked
+- **Zero-Knowledge**: Server never sees unencrypted data
 
 ## 📸 Screenshots & Animations
 

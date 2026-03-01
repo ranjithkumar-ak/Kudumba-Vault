@@ -9,7 +9,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Users, Plus, Trash2, FileText, Wallet } from "lucide-react";
+import { Users, Plus, Trash2, FileText, Wallet, Shield, Loader2, Eye, EyeOff } from "lucide-react";
+import { generateManagedWallet } from "@/services/walletManager";
 
 const MembersPage = () => {
   const { members, documents, addMember, removeMember } = useVault();
@@ -17,19 +18,43 @@ const MembersPage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [relationship, setRelationship] = useState("Spouse");
-  const [walletAddress, setWalletAddress] = useState("");
+  const [memberPassword, setMemberPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const handleAdd = async () => {
     if (!name || !email) return;
+    if (!memberPassword || memberPassword.length < 6) {
+      toast({ title: "Password required", description: "Member password must be at least 6 characters.", variant: "destructive" });
+      return;
+    }
+    if (memberPassword !== confirmPassword) {
+      toast({ title: "Passwords don't match", description: "Please make sure both passwords match.", variant: "destructive" });
+      return;
+    }
+
+    setAdding(true);
     try {
-      await addMember(name, email, relationship, walletAddress || undefined);
-      toast({ title: "Member added!", description: `${name} has been added to your family vault.` });
+      // Generate a blockchain wallet for the member, encrypted with their password.
+      // The private key is encrypted client-side (AES-256-GCM + PBKDF2) — never sent to server in plaintext.
+      const encryptedWallet = await generateManagedWallet(memberPassword);
+
+      await addMember(name, email, relationship, memberPassword, encryptedWallet);
+
+      toast({
+        title: "Member added!",
+        description: `${name} has been added with a secure blockchain wallet. Share their login credentials: email & password.`,
+      });
       setOpen(false);
       setName("");
       setEmail("");
-      setWalletAddress("");
+      setMemberPassword("");
+      setConfirmPassword("");
     } catch (err: any) {
       toast({ title: "Failed to add member", description: err?.message || "Something went wrong.", variant: "destructive" });
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -54,7 +79,7 @@ const MembersPage = () => {
             <Button className="gap-2"><Plus className="h-4 w-4" /> Add Member</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Add Family Member</DialogTitle><DialogDescription>Add a new family member to share documents securely</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Add Family Member</DialogTitle><DialogDescription>Add a new family member to share documents securely. A blockchain wallet will be created automatically for them.</DialogDescription></DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Jane Johnson" /></div>
               <div className="space-y-2"><Label>Email</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jane@family.com" /></div>
@@ -67,12 +92,50 @@ const MembersPage = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" /> Wallet Address <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                <Input value={walletAddress} onChange={e => setWalletAddress(e.target.value)} placeholder="0x..." className="font-mono text-sm" />
-                <p className="text-[11px] text-muted-foreground">Required for on-chain document sharing</p>
+
+              {/* Member login credentials */}
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-blue-600">
+                  <Shield className="h-4 w-4" />
+                  Member Login Password
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Set a password for this member. They'll use their email + this password to log in. A blockchain wallet is generated and encrypted with this password automatically.
+                </p>
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={memberPassword}
+                      onChange={e => setMemberPassword(e.target.value)}
+                      placeholder="Min 6 characters"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Confirm Password</Label>
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                  />
+                </div>
               </div>
-              <Button onClick={handleAdd} className="w-full" disabled={!name || !email}>Add to Family Vault</Button>
+
+              <Button onClick={handleAdd} className="w-full gap-2" disabled={!name || !email || !memberPassword || adding}>
+                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+                {adding ? "Creating Account & Wallet..." : "Add to Family Vault"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

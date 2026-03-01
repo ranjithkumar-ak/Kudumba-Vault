@@ -9,6 +9,14 @@ const memberSchema = new mongoose.Schema({
   avatarInitials: String,
   addedAt: { type: String, default: () => new Date().toISOString() },
   walletAddress: String,
+  // Reference to the User account created for this member
+  memberUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  // Managed wallet — encrypted private key (encrypted client-side with member's password)
+  encryptedWallet: {
+    encryptedKey: String,  // Hex-encoded AES-256-GCM ciphertext (IV prepended)
+    salt: String,          // Hex-encoded PBKDF2 salt
+    version: { type: Number, default: 1 },
+  },
 });
 
 memberSchema.set("toJSON", {

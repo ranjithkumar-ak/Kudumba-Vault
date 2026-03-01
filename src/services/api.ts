@@ -32,6 +32,13 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 export interface AuthResponse {
   token: string;
   user: { id: string; name: string; email: string; familyName: string; role: string };
+  /** Present for member-role users — encrypted wallet data for client-side decryption */
+  encryptedWallet?: {
+    encryptedKey: string;
+    salt: string;
+    address: string;
+    version: number;
+  };
 }
 
 export interface UserProfile {
@@ -40,6 +47,7 @@ export interface UserProfile {
   email: string;
   familyName: string;
   role: string;
+  walletAddress?: string;
 }
 
 export const authApi = {
@@ -156,7 +164,18 @@ export const membersApi = {
     return request("/members");
   },
 
-  create(data: { name: string; email: string; relationship: string; walletAddress?: string }): Promise<any> {
+  create(data: {
+    name: string;
+    email: string;
+    relationship: string;
+    password: string;
+    encryptedWallet?: {
+      encryptedKey: string;
+      salt: string;
+      address: string;
+      version: number;
+    };
+  }): Promise<any> {
     return request("/members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -182,5 +201,71 @@ export const alertsApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+  },
+};
+
+// ─── Verification (PIN + Biometric) ─────────────────────────────────────────
+
+export interface VerificationStatusResponse {
+  hasPin: boolean;
+  hasBiometric: boolean;
+  biometricDevices: { credentialId: string; deviceName: string; registeredAt: string }[];
+}
+
+export const verificationApi = {
+  /** Get current verification setup status */
+  status(): Promise<VerificationStatusResponse> {
+    return request("/verification/status");
+  },
+
+  /** Setup or update PIN (send SHA-256 hash) */
+  setupPin(pinHash: string): Promise<{ success: boolean }> {
+    return request("/verification/pin/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinHash }),
+    });
+  },
+
+  /** Verify PIN */
+  verifyPin(pinHash: string): Promise<{ success: boolean; verified: boolean }> {
+    return request("/verification/pin/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinHash }),
+    });
+  },
+
+  /** Remove PIN */
+  removePin(): Promise<{ success: boolean }> {
+    return request("/verification/pin", { method: "DELETE" });
+  },
+
+  /** Get biometric challenge */
+  getBiometricChallenge(): Promise<{ challenge: string }> {
+    return request("/verification/biometric/challenge");
+  },
+
+  /** Register biometric credential */
+  registerBiometric(data: { credentialId: string; publicKey: string; deviceName?: string }): Promise<{ success: boolean }> {
+    return request("/verification/biometric/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** Verify biometric */
+  verifyBiometric(credentialId: string): Promise<{ success: boolean; verified: boolean }> {
+    return request("/verification/biometric/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId }),
+    });
+  },
+
+  /** Remove biometric credential */
+  removeBiometric(credentialId: string): Promise<{ success: boolean }> {
+    return request(`/verification/biometric/${encodeURIComponent(credentialId)}`, { method: "DELETE" });
   },
 };

@@ -12,7 +12,7 @@ import { Lock, Shield, Users, Wallet, CheckCircle2, Loader2, UserPlus, AlertCirc
 
 const LoginPage = () => {
   const { isFirstTime, register, login, loginWithRole } = useVault();
-  const { status, wallet, connectWallet } = useBlockchain();
+  const { status, wallet, connectWallet, connectWithManagedWallet } = useBlockchain();
 
   const [mode, setMode] = useState<"login" | "register">(isFirstTime ? "register" : "login");
   const [role, setRole] = useState<UserRole>("owner");
@@ -40,12 +40,24 @@ const LoginPage = () => {
         await register(name.trim(), email.trim(), password, familyNameInput.trim());
       } else {
         if (!email.trim() || !password) { setError("Please enter your email and password."); setSubmitting(false); return; }
-        const ok = await login(email.trim(), password);
-        if (!ok) {
+        const result = await login(email.trim(), password);
+        if (!result.success) {
           setError("Invalid email or password.");
           setSubmitting(false);
           return;
         }
+
+        // For members with managed wallets: auto-connect their blockchain wallet
+        // The private key is decrypted in-browser using their password — never sent to server
+        if (result.encryptedWallet) {
+          try {
+            await connectWithManagedWallet(result.encryptedWallet, password);
+          } catch {
+            // Wallet connection failure shouldn't block login
+            console.warn("Managed wallet auto-connect failed — member can still use the vault");
+          }
+        }
+
         loginWithRole(role);
       }
     } catch (err: any) {
@@ -153,13 +165,24 @@ const LoginPage = () => {
               {mode === "register" ? "Already have an account? Sign in" : "New here? Create a vault"}
             </Button>
 
-            {/* Wallet Connection */}
+            {/* Wallet Connection — different behavior for owners vs members */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">blockchain wallet</span></div>
             </div>
 
-            {status === "connected" && wallet ? (
+            {mode === "login" && role === "member" ? (
+              /* Members get managed wallets — no MetaMask needed */
+              <div className="flex items-center gap-3 rounded-lg bg-blue-500/5 border border-blue-500/20 p-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10">
+                  <Shield className="h-4 w-4 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-blue-600">Auto-Managed Wallet</p>
+                  <p className="text-[10px] text-muted-foreground">Your blockchain wallet connects automatically on login — no extensions needed</p>
+                </div>
+              </div>
+            ) : status === "connected" && wallet ? (
               <div className="flex items-center gap-3 rounded-lg bg-green-500/5 border border-green-500/20 p-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500/10">
                   <CheckCircle2 className="h-4 w-4 text-green-500" />

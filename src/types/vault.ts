@@ -57,6 +57,8 @@ export interface FamilyMember {
   avatarInitials: string;
   addedAt: string;
   walletAddress?: string;
+  /** Whether this member has a managed (auto-generated) wallet */
+  hasWallet?: boolean;
 }
 
 export interface SecurityAlert {
